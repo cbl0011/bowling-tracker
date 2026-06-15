@@ -49,7 +49,7 @@
   .player-tab.add { border-style: dashed; font-size: 20px; line-height: 1; padding: 4px 12px; }
 
   /* Stats */
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1.5rem; }
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 1.5rem; }
   .stat { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 14px 12px; }
   .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
   .stat-value { font-size: 26px; font-weight: 700; color: var(--text); letter-spacing: -0.5px; }
@@ -197,6 +197,19 @@
   </div>
 </div>
 
+
+<!-- Export / Import -->
+<div class="card" style="margin-top:0">
+  <div class="card-title">Export &amp; import data</div>
+  <p style="font-size:13px; color:var(--muted); margin-bottom:1rem; line-height:1.6">Export saves all bowlers and scores as a file. Import loads that file on a new device — it will <strong style="color:var(--text)">merge</strong> with any existing data.</p>
+  <div style="display:flex; gap:8px">
+    <button class="btn btn-primary" style="flex:1" onclick="exportData()">Export data</button>
+    <button class="btn" style="flex:1" onclick="document.getElementById('import-file').click()">Import data</button>
+  </div>
+  <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)" />
+  <div id="import-status" style="margin-top:10px; font-size:13px; display:none"></div>
+</div>
+
 <!-- Add player modal -->
 <div class="modal-overlay" id="add-player-modal">
   <div class="modal">
@@ -265,6 +278,7 @@ function renderStats() {
   if (games.length === 0) {
     statsEl.innerHTML = `
       <div class="stat"><div class="stat-label">Average</div><div class="stat-value accent">—</div></div>
+      <div class="stat"><div class="stat-label">Daily avg</div><div class="stat-value">—</div></div>
       <div class="stat"><div class="stat-label">High score</div><div class="stat-value">—</div></div>
       <div class="stat"><div class="stat-label">Games</div><div class="stat-value">0</div></div>`;
     return;
@@ -272,8 +286,13 @@ function renderStats() {
   const scores = games.map(g => g.score);
   const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
   const high = Math.max(...scores);
+  const byDay = {};
+  games.forEach(g => { if (!byDay[g.date]) byDay[g.date] = []; byDay[g.date].push(g.score); });
+  const dayAvgs = Object.values(byDay).map(s => s.reduce((a, b) => a + b, 0) / s.length);
+  const dailyAvg = Math.round(dayAvgs.reduce((a, b) => a + b, 0) / dayAvgs.length);
   statsEl.innerHTML = `
     <div class="stat"><div class="stat-label">Average</div><div class="stat-value accent">${avg}</div></div>
+    <div class="stat"><div class="stat-label">Daily avg</div><div class="stat-value">${dailyAvg}</div></div>
     <div class="stat"><div class="stat-label">High score</div><div class="stat-value">${high}</div></div>
     <div class="stat"><div class="stat-label">Games</div><div class="stat-value">${games.length}</div></div>`;
 }
@@ -457,6 +476,55 @@ document.querySelectorAll('.modal-overlay').forEach(el => {
 });
 document.getElementById('new-player-name').addEventListener('keydown', e => { if (e.key === 'Enter') confirmAddPlayer(); });
 document.getElementById('score-input').addEventListener('keydown', e => { if (e.key === 'Enter') addGame(); });
+
+
+function exportData() {
+  const json = JSON.stringify(state, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'bowling-tracker-backup.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    const statusEl = document.getElementById('import-status');
+    try {
+      const imported = JSON.parse(ev.target.result);
+      if (!imported.players || !imported.games) throw new Error('Invalid file');
+      // Merge: add any new players, merge game arrays
+      imported.players.forEach(p => {
+        if (!state.players.includes(p)) state.players.push(p);
+        if (imported.games[p]) {
+          if (!state.games[p]) state.games[p] = [];
+          // Avoid exact duplicates (same date + score)
+          imported.games[p].forEach(g => {
+            const exists = state.games[p].some(x => x.date === g.date && x.score === g.score);
+            if (!exists) state.games[p].push(g);
+          });
+        }
+      });
+      saveState();
+      render();
+      statusEl.style.display = '';
+      statusEl.style.color = 'var(--success)';
+      statusEl.textContent = '✓ Data imported successfully';
+    } catch(err) {
+      statusEl.style.display = '';
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = '✕ Invalid file — please use a bowling tracker export';
+    }
+    e.target.value = '';
+    setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
+  };
+  reader.readAsText(file);
+}
 
 render();
 </script>
