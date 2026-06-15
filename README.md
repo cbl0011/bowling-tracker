@@ -1,1 +1,1 @@
-Check it out! https://github.com/cbl0011/bowling-tracker
+Check it out! https://cbl0011.github.io/bowling-tracker/
