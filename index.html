@@ -278,7 +278,7 @@ function renderStats() {
   if (games.length === 0) {
     statsEl.innerHTML = `
       <div class="stat"><div class="stat-label">Average</div><div class="stat-value accent">—</div></div>
-      <div class="stat"><div class="stat-label">Daily avg</div><div class="stat-value">—</div></div>
+      <div class="stat"><div class="stat-label">Today's avg</div><div class="stat-value">—</div></div>
       <div class="stat"><div class="stat-label">High score</div><div class="stat-value">—</div></div>
       <div class="stat"><div class="stat-label">Games</div><div class="stat-value">0</div></div>`;
     return;
@@ -286,13 +286,12 @@ function renderStats() {
   const scores = games.map(g => g.score);
   const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
   const high = Math.max(...scores);
-  const byDay = {};
-  games.forEach(g => { if (!byDay[g.date]) byDay[g.date] = []; byDay[g.date].push(g.score); });
-  const dayAvgs = Object.values(byDay).map(s => s.reduce((a, b) => a + b, 0) / s.length);
-  const dailyAvg = Math.round(dayAvgs.reduce((a, b) => a + b, 0) / dayAvgs.length);
+  const today = new Date().toISOString().split('T')[0];
+  const todayGames = games.filter(g => g.date === today);
+  const todayAvg = todayGames.length > 0 ? Math.round(todayGames.reduce((a, b) => a + b.score, 0) / todayGames.length) : null;
   statsEl.innerHTML = `
     <div class="stat"><div class="stat-label">Average</div><div class="stat-value accent">${avg}</div></div>
-    <div class="stat"><div class="stat-label">Daily avg</div><div class="stat-value">${dailyAvg}</div></div>
+    <div class="stat"><div class="stat-label">Today's avg</div><div class="stat-value">${todayAvg !== null ? todayAvg : '—'}</div></div>
     <div class="stat"><div class="stat-label">High score</div><div class="stat-value">${high}</div></div>
     <div class="stat"><div class="stat-label">Games</div><div class="stat-value">${games.length}</div></div>`;
 }
