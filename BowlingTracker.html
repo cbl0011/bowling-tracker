@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>Bowling Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f0f12;
+    --bg2: #19191f;
+    --bg3: #222229;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f0f0f0;
+    --muted: #888;
+    --accent: #5b8af5;
+    --accent-dim: rgba(91,138,245,0.15);
+    --danger: #e05252;
+    --danger-dim: rgba(224,82,82,0.12);
+    --success: #4db87a;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 16px; }
+  body { min-height: 100vh; }
+
+  /* Layout */
+  .app { max-width: 520px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+  @media (min-width: 600px) { .app { padding: 2.5rem 2rem 4rem; } }
+
+  /* Header */
+  .header { margin-bottom: 2rem; }
+  .header h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; color: var(--text); display: flex; align-items: center; gap: 10px; }
+  .header h1 svg { width: 28px; height: 28px; flex-shrink: 0; }
+
+  /* Player tabs */
+  .player-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  .player-tab {
+    padding: 6px 16px; border-radius: 20px; font-size: 14px; font-weight: 500;
+    cursor: pointer; border: 1px solid var(--border2);
+    background: transparent; color: var(--muted); transition: all 0.15s;
+  }
+  .player-tab:hover { color: var(--text); border-color: var(--border2); }
+  .player-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .player-tab.add { border-style: dashed; font-size: 20px; line-height: 1; padding: 4px 12px; }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1.5rem; }
+  .stat { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 14px 12px; }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .stat-value { font-size: 26px; font-weight: 700; color: var(--text); letter-spacing: -0.5px; }
+  .stat-value.accent { color: var(--accent); }
+
+  /* Card */
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; }
+  .card-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 1rem; }
+
+  /* Form */
+  .form-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .form-row input { flex: 1; }
+  input[type="number"], input[type="date"], input[type="text"] {
+    background: var(--bg3); border: 1px solid var(--border2); border-radius: var(--radius-sm);
+    color: var(--text); font-size: 15px; padding: 10px 12px; width: 100%;
+    outline: none; transition: border-color 0.15s;
+    color-scheme: dark;
+  }
+  input:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--muted); }
+  .btn {
+    padding: 10px 18px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--border2); background: transparent;
+    color: var(--text); transition: all 0.15s; white-space: nowrap;
+  }
+  .btn:hover { background: var(--bg3); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { opacity: 0.88; background: var(--accent); }
+  .btn-full { width: 100%; }
+  .btn-danger { color: var(--danger); border-color: transparent; background: transparent; padding: 6px 10px; font-size: 13px; }
+  .btn-danger:hover { background: var(--danger-dim); }
+
+  /* Chart */
+  .chart-wrap { position: relative; height: 180px; }
+
+  /* View toggle */
+  .view-toggle { display: flex; gap: 6px; margin-bottom: 1rem; }
+  .view-btn { flex: 1; padding: 8px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--border2); background: transparent; color: var(--muted); transition: all 0.15s; }
+  .view-btn.active { background: var(--bg3); color: var(--text); border-color: var(--border2); }
+
+  /* Filter bar */
+  .filter-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 1rem; }
+  .filter-group label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
+  .filter-group input { font-size: 13px; padding: 7px 10px; }
+  .filter-clear { font-size: 12px; color: var(--accent); background: none; border: none; cursor: pointer; padding: 0; margin-bottom: 1rem; display: block; }
+  .filter-clear:hover { opacity: 0.75; }
+
+  /* Game list */
+  .game-list { display: flex; flex-direction: column; gap: 0; }
+  .game-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .game-item:last-child { border-bottom: none; }
+  .game-score { font-size: 20px; font-weight: 700; color: var(--text); min-width: 44px; }
+  .game-score.high { color: var(--success); }
+  .game-date { font-size: 13px; color: var(--muted); }
+  .empty { color: var(--muted); font-size: 14px; text-align: center; padding: 2rem 0; }
+
+  /* Modal */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    align-items: center; justify-content: center; z-index: 100; padding: 1rem;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--radius); padding: 1.5rem; width: 100%; max-width: 320px; }
+  .modal h2 { font-size: 17px; font-weight: 600; margin-bottom: 1rem; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+
+  /* Delete player */
+  .player-manage { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+  .player-name-display { font-size: 18px; font-weight: 700; }
+  .link-btn { background: none; border: none; color: var(--danger); font-size: 13px; cursor: pointer; }
+  .link-btn:hover { opacity: 0.75; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <h1>
+      <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="14" cy="14" r="13" fill="#5b8af5" opacity="0.18"/>
+        <circle cx="14" cy="14" r="10" stroke="#5b8af5" stroke-width="2"/>
+        <circle cx="11" cy="11" r="1.5" fill="#5b8af5"/>
+        <circle cx="14.5" cy="9.5" r="1.5" fill="#5b8af5"/>
+        <circle cx="16.5" cy="12.5" r="1.5" fill="#5b8af5"/>
+      </svg>
+      Bowling Tracker
+    </h1>
+  </header>
+
+  <div class="player-bar" id="player-bar"></div>
+
+  <div class="player-manage">
+    <div class="player-name-display" id="player-name-display"></div>
+    <button class="link-btn" id="delete-player-btn" onclick="promptDeletePlayer()">Remove bowler</button>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <!-- Add game -->
+  <div class="card">
+    <div class="card-title">Add game</div>
+    <div class="form-row">
+      <input type="number" id="score-input" placeholder="Score (0–300)" min="0" max="300" />
+      <input type="date" id="date-input" style="max-width:160px" />
+    </div>
+    <button class="btn btn-primary btn-full" onclick="addGame()">Add game</button>
+  </div>
+
+  <!-- Chart -->
+  <div class="card" id="chart-card" style="display:none">
+    <div class="card-title">Score trend</div>
+    <div class="chart-wrap">
+      <canvas id="chart"></canvas>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="card" id="history-card">
+    <div class="card-title" style="margin-bottom:0.75rem">Game history</div>
+    <div class="view-toggle">
+      <button class="view-btn active" id="view-all-btn" onclick="setView('all')">All games</button>
+      <button class="view-btn" id="view-filter-btn" onclick="setView('filter')">Filter</button>
+    </div>
+    <div id="filter-panel" style="display:none">
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label>Date from</label>
+          <input type="date" id="filter-date-from" oninput="renderHistory()" />
+        </div>
+        <div class="filter-group">
+          <label>Date to</label>
+          <input type="date" id="filter-date-to" oninput="renderHistory()" />
+        </div>
+        <div class="filter-group">
+          <label>Min score</label>
+          <input type="number" id="filter-score-min" placeholder="0" min="0" max="300" oninput="renderHistory()" />
+        </div>
+        <div class="filter-group">
+          <label>Max score</label>
+          <input type="number" id="filter-score-max" placeholder="300" min="0" max="300" oninput="renderHistory()" />
+        </div>
+      </div>
+      <button class="filter-clear" onclick="clearFilters()">Clear filters</button>
+    </div>
+    <div class="game-list" id="game-list"></div>
+  </div>
+</div>
+
+<!-- Add player modal -->
+<div class="modal-overlay" id="add-player-modal">
+  <div class="modal">
+    <h2>Add bowler</h2>
+    <input type="text" id="new-player-name" placeholder="Name" maxlength="20" style="margin-bottom:4px" />
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('add-player-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmAddPlayer()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete player modal -->
+<div class="modal-overlay" id="delete-player-modal">
+  <div class="modal">
+    <h2 id="delete-modal-title">Remove bowler?</h2>
+    <p style="font-size:14px; color:var(--muted); margin-bottom:1rem" id="delete-modal-body"></p>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('delete-player-modal')">Cancel</button>
+      <button class="btn btn-primary" style="background:var(--danger);border-color:var(--danger)" onclick="confirmDeletePlayer()">Remove</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'bowling_tracker_v2';
+let state = loadState();
+let currentPlayer = state.players[0] || 'Me';
+let chartInstance = null;
+let currentView = 'all';
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return { players: ['Me'], games: {} };
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function getGames(player) {
+  return (state.games[player] || []).slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+}
+
+function fmtDate(d) {
+  const dt = new Date(d + 'T12:00:00');
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function renderPlayerBar() {
+  const bar = document.getElementById('player-bar');
+  bar.innerHTML = state.players.map(p =>
+    `<button class="player-tab${p === currentPlayer ? ' active' : ''}" onclick="selectPlayer('${p.replace(/'/g, "\\'")}')">${p}</button>`
+  ).join('') + `<button class="player-tab add" onclick="openModal('add-player-modal')" aria-label="Add bowler">+</button>`;
+  document.getElementById('player-name-display').textContent = currentPlayer;
+  const delBtn = document.getElementById('delete-player-btn');
+  delBtn.style.display = state.players.length > 1 ? '' : 'none';
+}
+
+function renderStats() {
+  const games = getGames(currentPlayer);
+  const statsEl = document.getElementById('stats');
+  if (games.length === 0) {
+    statsEl.innerHTML = `
+      <div class="stat"><div class="stat-label">Average</div><div class="stat-value accent">—</div></div>
+      <div class="stat"><div class="stat-label">High score</div><div class="stat-value">—</div></div>
+      <div class="stat"><div class="stat-label">Games</div><div class="stat-value">0</div></div>`;
+    return;
+  }
+  const scores = games.map(g => g.score);
+  const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  const high = Math.max(...scores);
+  statsEl.innerHTML = `
+    <div class="stat"><div class="stat-label">Average</div><div class="stat-value accent">${avg}</div></div>
+    <div class="stat"><div class="stat-label">High score</div><div class="stat-value">${high}</div></div>
+    <div class="stat"><div class="stat-label">Games</div><div class="stat-value">${games.length}</div></div>`;
+}
+
+function renderChart() {
+  const games = getGames(currentPlayer);
+  const card = document.getElementById('chart-card');
+  if (games.length < 2) { card.style.display = 'none'; if (chartInstance) { chartInstance.destroy(); chartInstance = null; } return; }
+  card.style.display = '';
+  const canvas = document.getElementById('chart');
+  const labels = games.map(g => fmtDate(g.date));
+  const scores = games.map(g => g.score);
+  const avgVal = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  chartInstance = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Score',
+          data: scores,
+          borderColor: '#5b8af5',
+          backgroundColor: 'rgba(91,138,245,0.08)',
+          pointBackgroundColor: '#5b8af5',
+          pointRadius: scores.length > 20 ? 2 : 4,
+          pointHoverRadius: 6,
+          tension: 0.35,
+          borderWidth: 2,
+          fill: true
+        },
+        {
+          label: 'Average',
+          data: scores.map(() => avgVal),
+          borderColor: 'rgba(255,255,255,0.2)',
+          borderDash: [4, 4],
+          borderWidth: 1,
+          pointRadius: 0,
+          fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.dataset.label === 'Average' ? ` Avg: ${avgVal}` : ` Score: ${ctx.parsed.y}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#666', font: { size: 11 }, maxRotation: 30, maxTicksLimit: 8 },
+          grid: { display: false }
+        },
+        y: {
+          ticks: { color: '#666', font: { size: 11 }, stepSize: 20 },
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          min: Math.max(0, Math.min(...scores) - 20),
+          max: Math.min(300, Math.max(...scores) + 20)
+        }
+      }
+    }
+  });
+}
+
+function renderHistory() {
+  const games = getGames(currentPlayer);
+  const el = document.getElementById('game-list');
+  if (games.length === 0) { el.innerHTML = '<div class="empty">No games yet — add one above</div>'; return; }
+  const highScore = Math.max(...games.map(g => g.score));
+  let filtered = [...games].reverse();
+  if (currentView === 'filter') {
+    const df = document.getElementById('filter-date-from').value;
+    const dt = document.getElementById('filter-date-to').value;
+    const smin = document.getElementById('filter-score-min').value;
+    const smax = document.getElementById('filter-score-max').value;
+    if (df) filtered = filtered.filter(g => g.date >= df);
+    if (dt) filtered = filtered.filter(g => g.date <= dt);
+    if (smin !== '') filtered = filtered.filter(g => g.score >= parseInt(smin));
+    if (smax !== '') filtered = filtered.filter(g => g.score <= parseInt(smax));
+  }
+  if (filtered.length === 0) { el.innerHTML = '<div class="empty">No games match those filters</div>'; return; }
+  el.innerHTML = filtered.map(g => {
+    const origIdx = (state.games[currentPlayer] || []).findIndex(x => x.date === g.date && x.score === g.score);
+    return `<div class="game-item">
+      <div>
+        <div class="game-score${g.score === highScore ? ' high' : ''}">${g.score}</div>
+        <div class="game-date">${fmtDate(g.date)}</div>
+      </div>
+      <button class="btn btn-danger" onclick="deleteGame(${origIdx})" aria-label="Delete game">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function render() {
+  renderPlayerBar();
+  renderStats();
+  renderChart();
+  renderHistory();
+}
+
+function selectPlayer(p) { currentPlayer = p; clearFilters(); setView('all'); render(); }
+
+function addGame() {
+  const scoreEl = document.getElementById('score-input');
+  const dateEl = document.getElementById('date-input');
+  const score = parseInt(scoreEl.value);
+  if (isNaN(score) || score < 0 || score > 300) { alert('Enter a score between 0 and 300.'); return; }
+  const date = dateEl.value || new Date().toISOString().split('T')[0];
+  if (!state.games[currentPlayer]) state.games[currentPlayer] = [];
+  state.games[currentPlayer].push({ score, date });
+  saveState();
+  scoreEl.value = '';
+  render();
+}
+
+function deleteGame(idx) {
+  if (!confirm('Delete this game?')) return;
+  state.games[currentPlayer].splice(idx, 1);
+  saveState();
+  render();
+}
+
+function setView(v) {
+  currentView = v;
+  document.getElementById('view-all-btn').classList.toggle('active', v === 'all');
+  document.getElementById('view-filter-btn').classList.toggle('active', v === 'filter');
+  document.getElementById('filter-panel').style.display = v === 'filter' ? '' : 'none';
+  renderHistory();
+}
+
+function clearFilters() {
+  ['filter-date-from','filter-date-to','filter-score-min','filter-score-max'].forEach(id => document.getElementById(id).value = '');
+  renderHistory();
+}
+
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+  if (id === 'add-player-modal') setTimeout(() => document.getElementById('new-player-name').focus(), 50);
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  if (id === 'add-player-modal') document.getElementById('new-player-name').value = '';
+}
+
+function confirmAddPlayer() {
+  const name = document.getElementById('new-player-name').value.trim();
+  if (!name) return;
+  if (state.players.includes(name)) { alert('That name already exists.'); return; }
+  state.players.push(name);
+  saveState();
+  closeModal('add-player-modal');
+  selectPlayer(name);
+}
+
+function promptDeletePlayer() {
+  document.getElementById('delete-modal-title').textContent = `Remove ${currentPlayer}?`;
+  const count = (state.games[currentPlayer] || []).length;
+  document.getElementById('delete-modal-body').textContent = `This will permanently delete ${currentPlayer} and all ${count} of their game${count !== 1 ? 's' : ''}.`;
+  openModal('delete-player-modal');
+}
+
+function confirmDeletePlayer() {
+  const idx = state.players.indexOf(currentPlayer);
+  state.players.splice(idx, 1);
+  delete state.games[currentPlayer];
+  saveState();
+  closeModal('delete-player-modal');
+  currentPlayer = state.players[0];
+  render();
+}
+
+document.getElementById('date-input').value = new Date().toISOString().split('T')[0];
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+document.getElementById('new-player-name').addEventListener('keydown', e => { if (e.key === 'Enter') confirmAddPlayer(); });
+document.getElementById('score-input').addEventListener('keydown', e => { if (e.key === 'Enter') addGame(); });
+
+render();
+</script>
+</body>
+</html>
